@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html l wessang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel World Dlicom</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #0f0f1b;
+            color: #ffffff;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Pixelated crisp graphics for canvas */
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background-color: #5c94fc;
+            /* Retro Super Mario Sky Blue */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+            border: 4px solid #1a1a2e;
+        }
+
+        /* Custom Retro UI Buttons */
+        .pixel-btn {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(180deg, #ff9d00 0%, #e65100 100%);
+            border: 4px solid #ffffff;
+            box-shadow: inset -4px -4px 0px 0px #9d2d00, inset 4px 4px 0px 0px #ffc107, 4px 4px 0px 0px #000000;
+            color: #ffffff;
+            text-shadow: 2px 2px #000;
+            transition: transform 0.1s, filter 0.1s;
+            cursor: pointer;
+        }
+
+        .pixel-btn:hover {
+            filter: brightness(1.15);
+        }
+
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: inset -2px -2px 0px 0px #9d2d00, inset 2px 2px 0px 0px #ffc107, 2px 2px 0px 0px #000000;
+        }
+
+        .pixel-btn-blue {
+            background: linear-gradient(180deg, #29b6f6 0%, #0288d1 100%);
+            box-shadow: inset -4px -4px 0px 0px #01579b, inset 4px 4px 0px 0px #81d4fa, 4px 4px 0px 0px #000000;
+        }
+
+        .pixel-btn-green {
+            background: linear-gradient(180deg, #66bb6a 0%, #2e7d32 100%);
+            box-shadow: inset -4px -4px 0px 0px #1b5e20, inset 4px 4px 0px 0px #a5d6a7, 4px 4px 0px 0px #000000;
+        }
+
+        .pixel-btn-pink {
+            background: linear-gradient(180deg, #f48fb1 0%, #c2185b 100%);
+            box-shadow: inset -4px -4px 0px 0px #880e4f, inset 4px 4px 0px 0px #f8bbd0, 4px 4px 0px 0px #000000;
+        }
+
+        .pixel-btn-yellow {
+            background: linear-gradient(180deg, #ffca28 0%, #ff8f00 100%);
+            box-shadow: inset -4px -4px 0px 0px #c77700, inset 4px 4px 0px 0px #ffe082, 4px 4px 0px 0px #000000;
+        }
+
+        .pixel-panel {
+            background-color: #1e1e2f;
+            border: 4px solid #ffffff;
+            box-shadow: inset -4px -4px 0px 0px #0d0d18, inset 4px 4px 0px 0px #3d3d5c, 0 10px 25px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Touch Control Buttons styling */
+        .touch-btn {
+            background: rgba(255, 255, 255, 0.25);
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 16px;
+            backdrop-filter: blur(4px);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            transition: background 0.05s, transform 0.05s;
+            touch-action: none;
+        }
+
+        .touch-btn:active,
+        .touch-btn.pressed {
+            background: rgba(255, 255, 255, 0.7);
+            transform: scale(0.92);
+        }
+
+        /* Custom Scrollbar for Leaderboard */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ff9d00;
+            border-radius: 4px;
+        }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase state container
+        window.FirebaseApp = {
+            db: null,
+            auth: null,
+            user: null,
+            appId: typeof __app_id !== 'undefined' ? __app_id : 'pixel-world-dlicom',
+            isInitialized: false
+        };
+
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                const config = JSON.parse(__firebase_config);
+                const app = initializeApp(config);
+                window.FirebaseApp.db = getFirestore(app);
+                window.FirebaseApp.auth = getAuth(app);
+
+                const auth = window.FirebaseApp.auth;
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (u) => {
+                    if (u) {
+                        window.FirebaseApp.user = u;
+                        window.FirebaseApp.isInitialized = true;
+                        if (window.loadOnlineLeaderboard) {
+                            window.loadOnlineLeaderboard();
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn("Firebase initialized in fallback mode:", err);
+        }
+    </script>
+</head>
+
+<body class="select-none bg-slate-950">
+
+    <div id="game-wrapper"
+        class="relative w-full max-w-4xl h-full max-h-[600px] my-auto flex flex-col justify-center items-center overflow-hidden p-2">
+
+        <!-- CANVAS DISPLAY -->
+        <canvas id="gameCanvas" width="800" height="450" class="w-full h-auto max-h-full rounded-lg"></canvas>
+
+        <!-- ON-SCREEN HUD OVERLAY (Always visible during gameplay) -->
+        <div id="hud-overlay"
+            class="absolute top-4 left-4 right-4 flex justify-between items-center text-xs md:text-sm text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] pointer-events-none hidden">
+            <div class="flex flex-col gap-1">
+                <span class="text-yellow-400">SCORE</span>
+                <span id="hud-score">000000</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Coin Counter Icon -->
+                <canvas id="hud-coin-icon" width="20" height="20"
+                    class="border-0 shadow-none bg-transparent inline-block"></canvas>
+                <span class="text-amber-300">x <span id="hud-coins">00</span></span>
+            </div>
+            <div class="flex flex-col gap-1 text-center">
+                <span class="text-sky-300">WORLD</span>
+                <span id="hud-world">1-1</span>
+            </div>
+            <div class="flex flex-col gap-1 text-center">
+                <span class="text-emerald-400">TIME</span>
+                <span id="hud-time">300</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="text-rose-400">LIVES</span>
+                <span id="hud-lives" class="text-yellow-300">x 3</span>
+            </div>
+        </div>
+
+        <!-- ON-SCREEN TOUCH CONTROLS (Enlarged navigation buttons & jump button) -->
+        <div id="touch-controls"
+            class="absolute inset-0 pointer-events-none hidden flex justify-between items-end p-4 pb-10 z-20">
+            <!-- Left Side Controls (Move Left / Right - Enlarged to w-20 h-20) -->
+            <div class="pointer-events-auto flex gap-4 ml-2 mb-2">
+                <button id="btn-left" class="touch-btn w-20 h-20 text-2xl active:bg-white/60">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <button id="btn-right" class="touch-btn w-20 h-20 text-2xl active:bg-white/60">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- Right Side Control (Jump Button - Enlarged to w-24 h-24) -->
+            <div class="pointer-events-auto mr-4 mb-6">
+                <button id="btn-jump" class="touch-btn w-24 h-24 rounded-full bg-amber-500/30 border-amber-300 active:bg-amber-400/80">
+                    <span class="text-sm font-black tracking-wider">JUMP</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN MENU OVERLAY -->
+        <div id="menu-overlay" class="absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 z-30">
+            <div class="pixel-panel p-6 max-w-md w-full text-center flex flex-col items-center gap-4">
+                <h1 class="text-xl md:text-2xl text-amber-400 tracking-wider leading-relaxed animate-pulse">
+                    PIXEL WORLD<br/><span class="text-sky-400">DLICOM</span>
+                </h1>
+
+                <!-- Character Customization Selector (Blue, Pink, Yellow) -->
+                <div class="w-full my-2 bg-slate-900/80 p-3 rounded border border-slate-700">
+                    <p class="text-xs text-slate-300 mb-2">SELECT CHARACTER COLOR:</p>
+                    <div class="flex justify-between items-center gap-2 w-full">
+                        <button onclick="selectCharacter('blue')" id="char-btn-blue" class="flex-1 pixel-btn pixel-btn-blue text-[10px] md:text-xs py-2 px-1 rounded flex flex-col items-center justify-center gap-1.5 ring-4 ring-yellow-400 min-w-0">
+                            <canvas id="preview-blue" width="48" height="32" class="bg-transparent border-0 shadow-none block"></canvas>
+                            <span class="tracking-widest">BLUE</span>
+                        </button>
+                        <button onclick="selectCharacter('pink')" id="char-btn-pink" class="flex-1 pixel-btn pixel-btn-pink text-[10px] md:text-xs py-2 px-1 rounded flex flex-col items-center justify-center gap-1.5 min-w-0">
+                            <canvas id="preview-pink" width="48" height="32" class="bg-transparent border-0 shadow-none block"></canvas>
+                            <span class="tracking-widest">PINK</span>
+                        </button>
+                        <button onclick="selectCharacter('yellow')" id="char-btn-yellow" class="flex-1 pixel-btn pixel-btn-yellow text-[10px] md:text-xs py-2 px-1 rounded flex flex-col items-center justify-center gap-1.5 min-w-0">
+                            <canvas id="preview-yellow" width="48" height="32" class="bg-transparent border-0 shadow-none block"></canvas>
+                            <span class="tracking-widest">YELLOW</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Player Name Input -->
+                <div class="w-full text-left">
+                    <label class="text-[10px] text-slate-400 block mb-1">PLAYER NAME:</label>
+                    <input type="text" id="player-name-input" maxlength="12" value="Player1" class="w-full bg-slate-950 border-2 border-amber-400 p-2 text-xs text-amber-300 uppercase focus:outline-none text-center">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col gap-3 w-full mt-2">
+                    <button onclick="startGame()" class="pixel-btn text-sm py-3 w-full">START GAME</button>
+                    <button onclick="openLeaderboard()" class="pixel-btn pixel-btn-blue text-xs py-2.5 w-full">LEADERBOARD</button>
+                    <button onclick="toggleAudio()" id="btn-audio-toggle" class="pixel-btn pixel-btn-green text-[10px] py-2 w-full">SOUND: ON</button>
+                </div>
+
+                <p class="text-[9px] text-slate-400 mt-2">Use Arrow Keys / Touch Controls to Move & Jump</p>
+            </div>
+        </div>
+
+        <!-- LEADERBOARD MODAL OVERLAY -->
+        <div id="leaderboard-modal"
+            class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-4 z-40 hidden">
+            <div class="pixel-panel p-5 max-w-md w-full text-center flex flex-col gap-3 max-h-[85vh]">
+                <h2 class="text-lg text-yellow-400 border-b-2 border-amber-500 pb-2">TOP PLAYERS</h2>
+
+                <div id="leaderboard-list" class="overflow-y-auto max-h-60 flex flex-col gap-2 my-2 text-xs pr-1">
+                    <p class="text-slate-400 text-center py-4">Loading scores...</p>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="closeLeaderboard()" class="pixel-btn text-xs py-2 w-full">BACK TO MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER / VICTORY OVERLAY -->
+        <div id="game-over-modal"
+            class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center p-4 z-40 hidden">
+            <div class="pixel-panel p-6 max-w-sm w-full text-center flex flex-col gap-4">
+                <h2 id="game-over-title" class="text-xl text-red-500">GAME OVER</h2>
+                <div class="bg-slate-900 p-3 rounded border border-slate-700 text-xs flex flex-col gap-2">
+                    <div class="flex justify-between text-slate-300">
+                        <span>TOTAL SCORE:</span>
+                        <span id="final-score" class="text-amber-400">0</span>
+                    </div>
+                    <div class="flex justify-between text-slate-300">
+                        <span>COINS COLLECTED:</span>
+                        <span id="final-coins" class="text-yellow-300">0</span>
+                    </div>
+                </div>
+                <button id="btn-next-stage" onclick="nextStage()" class="pixel-btn pixel-btn-green text-xs py-3 hidden">NEXT STAGE</button>
+                <button id="btn-restart" onclick="restartGame()" class="pixel-btn text-xs py-3">PLAY AGAIN</button>
+                <button onclick="returnToMenu()" class="pixel-btn pixel-btn-blue text-xs py-2">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* Retro 8-bit Audio Synthesizer Engine using Web Audio API */
+        class RetroAudio {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playJump() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playCoin() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987.77, now); // B5
+                osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            playStomp() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            playBump() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.setValueAtTime(60, now + 0.05);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            playWin() {
+                if (!this.enabled) return;
+                this.init();
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99]; // C E G C E G
+                notes.forEach((freq, i) => {
+                    const now = this.ctx.currentTime + i * 0.08;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                });
+            }
+
+            playGameOver() {
+                if (!this.enabled) return;
+                this.init();
+                const notes = [400, 350, 300, 250];
+                notes.forEach((freq, i) => {
+                    const now = this.ctx.currentTime + i * 0.15;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.18);
+                });
+            }
+        }
+
+        const audio = new RetroAudio();
+
+        function toggleAudio() {
+            audio.enabled = !audio.enabled;
+            document.getElementById('btn-audio-toggle').innerText = `SOUND: ${audio.enabled ? 'ON' : 'OFF'}`;
+        }
+    </script>
+
+    <script>
+        /* Color Palette maps for character variants */
+        const CHARACTER_COLORS = {
+            blue: {
+                main: '#4355ff',      // Primary Vibrant Blue from Image 1
+                highlight: '#6283ff', // Lighter bridge/shine
+                dark: '#2734a4'       // Shadow outline
+            },
+            pink: {
+                main: '#ff3b8b',      // Bright Pink
+                highlight: '#ff73b2', // Lighter Pink highlight
+                dark: '#aa1955'       // Shadow Pink
+            },
+            yellow: {
+                main: '#ffb700',      // Golden Yellow
+                highlight: '#ffe066', // Bright Yellow
+                dark: '#b37e00'       // Dark Gold shadow
+            }
+        };
+
+        let selectedColorKey = 'blue';
+
+        function selectCharacter(colorKey) {
+            selectedColorKey = colorKey;
+            ['blue', 'pink', 'yellow'].forEach(c => {
+                const btn = document.getElementById(`char-btn-${c}`);
+                if (btn) {
+                    if (c === colorKey) {
+                        btn.classList.add('ring-4', 'ring-yellow-400');
+                    } else {
+                        btn.classList.remove('ring-4', 'ring-yellow-400');
+                    }
+                }
+            });
+        }
+
+        /* Draw Dlicom Character onto any 2D canvas context */
+        function drawDlicomCharacter(ctx, x, y, width, height, colorKey = 'blue', facingLeft = false, frame = 0) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (facingLeft) {
+                ctx.scale(-1, 1);
+                ctx.translate(-width, 0);
+            }
+
+            const palette = CHARACTER_COLORS[colorKey] || CHARACTER_COLORS.blue;
+
+            // Pixel grid sizing based on exact proportions of Image 1
+            const rX = width / 24;
+            const rY = height / 16;
+
+            // 1. Draw Main Body (Pill / Oval shape with speech bubble tail)
+            ctx.fillStyle = palette.main;
+            
+            // Central pill block
+            ctx.fillRect(4 * rX, 2 * rY, 16 * rX, 12 * rY);
+            ctx.fillRect(2 * rX, 4 * rY, 20 * rX, 8 * rY);
+            ctx.fillRect(1 * rX, 5 * rY, 22 * rX, 6 * rY);
+
+            // Speech bubble tail at bottom-right (as seen in Image 1)
+            ctx.fillRect(13 * rX, 14 * rY, 4 * rX, 2 * rY);
+            ctx.fillRect(14 * rX, 15 * rY, 2 * rX, 1 * rY);
+
+            // Lighter center bridge highlight (Image 1 feature)
+            ctx.fillStyle = palette.highlight;
+            ctx.fillRect(10 * rX, 7 * rY, 4 * rX, 2 * rY);
+
+            // 2. Eyes (Diamond / Rhombus shape matching Image 1)
+            // Left Eye
+            ctx.fillStyle = '#ffffff'; // White outer diamond frame
+            ctx.fillRect(5 * rX, 6 * rY, 4 * rX, 4 * rY);
+            ctx.fillRect(6 * rX, 5 * rY, 2 * rX, 6 * rY);
+
+            ctx.fillStyle = '#000000'; // Black inner pupil
+            ctx.fillRect(6 * rX, 6 * rY, 2 * rX, 4 * rY);
+
+            ctx.fillStyle = '#ffffff'; // White pixel shine dot
+            ctx.fillRect(6 * rX, 6 * rY, 1 * rX, 1 * rY);
+
+            // Right Eye
+            ctx.fillStyle = '#ffffff'; // White outer diamond frame
+            ctx.fillRect(15 * rX, 6 * rY, 4 * rX, 4 * rY);
+            ctx.fillRect(16 * rX, 5 * rY, 2 * rX, 6 * rY);
+
+            ctx.fillStyle = '#000000'; // Black inner pupil
+            ctx.fillRect(16 * rX, 6 * rY, 2 * rX, 4 * rY);
+
+            ctx.fillStyle = '#ffffff'; // White pixel shine dot
+            ctx.fillRect(16 * rX, 6 * rY, 1 * rX, 1 * rY);
+
+            // 3. Smiling Mouth
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(11 * rX, 10 * rY, 2 * rX, 1 * rY);
+            ctx.fillRect(10 * rX, 9 * rY, 1 * rX, 1 * rY);
+            ctx.fillRect(13 * rX, 9 * rY, 1 * rX, 1 * rY);
+
+            // Animated running feet / squish effect
+            if (frame === 1) {
+                ctx.fillStyle = palette.dark;
+                ctx.fillRect(3 * rX, 13 * rY, 3 * rX, 2 * rY);
+                ctx.fillRect(17 * rX, 12 * rY, 3 * rX, 2 * rY);
+            } else if (frame === 2) {
+                ctx.fillStyle = palette.dark;
+                ctx.fillRect(4 * rX, 12 * rY, 3 * rX, 2 * rY);
+                ctx.fillRect(18 * rX, 13 * rY, 3 * rX, 2 * rY);
+            }
+
+            ctx.restore();
+        }
+
+        /* Draw Custom Coin (matching Image 2) */
+        function drawPixelCoin(ctx, x, y, size, animationFrame = 0) {
+            ctx.save();
+            ctx.translate(x + size / 2, y + size / 2);
+
+            // Width scaling for spinning animation
+            const scaleX = Math.abs(Math.cos(animationFrame * 0.15));
+            ctx.scale(scaleX, 1);
+
+            const r = size / 2;
+
+            // 1. Outer Gold Circle / Ring
+            ctx.fillStyle = '#d97706'; // Dark amber border
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Inner Golden Face
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bright yellow top highlight
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(-r * 0.15, -r * 0.15, r * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner Shadow Ring
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = size * 0.08;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 3. Center Emblem (Slanted Double-Wing S with Diamond - matching Image 2)
+            ctx.fillStyle = '#ffffff';
+            
+            // Central Diamond
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.2);
+            ctx.lineTo(r * 0.15, 0);
+            ctx.lineTo(0, r * 0.2);
+            ctx.lineTo(-r * 0.15, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Top Slanted Wing
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.35, -r * 0.1);
+            ctx.lineTo(r * 0.35, -r * 0.35);
+            ctx.lineTo(r * 0.1, -r * 0.1);
+            ctx.closePath();
+            ctx.fill();
+
+            // Bottom Slanted Wing
+            ctx.beginPath();
+            ctx.moveTo(r * 0.35, r * 0.1);
+            ctx.lineTo(-r * 0.35, r * 0.35);
+            ctx.lineTo(-r * 0.1, r * 0.1);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        /* Draw Custom DLICOM Logo Watermark (Matching Image 3) */
+        function drawDlicomBackgroundLogo(ctx, x, y, scale) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+
+            // Styling for watermark (semi-transparent white for game background)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+
+            // 1. Central Solid Diamond (Belah ketupat tengah padat persis gambar terbaru)
+            ctx.beginPath();
+            ctx.moveTo(0, -12);
+            ctx.lineTo(12, 0);
+            ctx.lineTo(0, 12);
+            ctx.lineTo(-12, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Top Swoop / Wing (Sayap Atas - Desain sayap tajam memanjang)
+            ctx.beginPath();
+            ctx.moveTo(-5, -17); // Ujung atas potongan sejajar
+            // Lengkungan dalam menuju ujung tajam sayap kanan
+            ctx.bezierCurveTo(25, -15, 50, -18, 80, -25); 
+            // Lengkungan luar yang luas kembali ke bagian kiri yang membulat
+            ctx.bezierCurveTo(35, -50, -30, -55, -45, -15);
+            // Kait dalam (hook) menuju potongan bawah
+            ctx.bezierCurveTo(-50, -2, -32, 2, -17, -5);
+            // Garis lurus potongan (100% paralel dengan sisi belah ketupat)
+            ctx.lineTo(-5, -17);
+            ctx.fill();
+
+            // 3. Bottom Swoop / Wing (Sayap Bawah - Cerminan Sayap Atas)
+            ctx.beginPath();
+            ctx.moveTo(5, 17); // Ujung bawah potongan sejajar
+            // Lengkungan dalam menuju ujung tajam sayap kiri
+            ctx.bezierCurveTo(-25, 15, -50, 18, -80, 25);
+            // Lengkungan luar yang luas kembali ke bagian kanan yang membulat
+            ctx.bezierCurveTo(-35, 50, 30, 55, 45, 15);
+            // Kait dalam (hook) menuju potongan atas
+            ctx.bezierCurveTo(50, 2, 32, -2, 17, 5);
+            // Garis lurus potongan (100% paralel dengan sisi belah ketupat)
+            ctx.lineTo(5, 17);
+            ctx.fill();
+
+            // 4. Text "DLICOM"
+            ctx.font = 'bold 28px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            if (ctx.letterSpacing !== undefined) {
+                ctx.letterSpacing = '5px';
+            }
+            ctx.fillText('DLICOM', 0, 42);
+
+            ctx.restore();
+        }
+
+        // Render Character Previews in Menu
+        window.addEventListener('DOMContentLoaded', () => {
+            ['blue', 'pink', 'yellow'].forEach(color => {
+                const canvas = document.getElementById(`preview-${color}`);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawDlicomCharacter(ctx, 0, 0, 48, 32, color);
+                }
+            });
+
+            const coinCanvas = document.getElementById('hud-coin-icon');
+            if (coinCanvas) {
+                const ctx = coinCanvas.getContext('2d');
+                drawPixelCoin(ctx, 0, 0, 20, 0);
+            }
+        });
+    </script>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Constants & Stage Definitions
+        const TILE_SIZE = 32;
+        const GRAVITY = 0.45;
+        const FRICTION = 0.82;
+
+        const STAGES = [
+            {
+                world: "1-1",
+                bgColor: "#5c94fc", // Classic Blue Sky
+                time: 300,
+                map: [
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                           F                                ",
+                    "                                                                                                                                           F                                ",
+                    "          C C C C                  C C C C C                  C C C C C C C                  C C C C C                                     F                                ",
+                    "        ? B ? B ?                B B ? B B                  B ? B ? B ? B                  ? B ? B ?                                       F                                ",
+                    "                          P                          P                          P                          P                               F                                ",
+                    "  C         E             p            E             p            E             p            E             p            E                  F                                ",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+                ]
+            },
+            {
+                world: "1-2",
+                bgColor: "#2d1b4e", // Cavern Dusk Night
+                time: 300,
+                map: [
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                           F                                ",
+                    "                                                                                                                                           F                                ",
+                    "          C C C C C                   C C C C C C C                  C C C C C C C                                                         F                                ",
+                    "        ? B ? B ? B              P    B ? B ? B ? B              P   ? B ? B ? B ?                                                         F                                ",
+                    "                                 p                               p                                                                         F                                ",
+                    "  C         E       E            p      E       E                p     E       E                      E                                F                                ",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+                ]
+            },
+            {
+                world: "1-3",
+                bgColor: "#1a0033", // Midnight Castle Heights
+                time: 300,
+                map: [
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                                                            ",
+                    "                                                                                                                                           F                                ",
+                    "                                                                                                                                           F                                ",
+                    "          C C C C C C C                C C C C C C C                 C C C C C C C                                                         F                                ",
+                    "        ? B ? B ? B ? B ?        P   ? B ? B ? B ? B          P    ? B ? B ? B ? B                                                         F                                ",
+                    "                                 p                            p                                                                            F                                ",
+                    "  C         E       E            p      E       E             p     E       E                      E                                       F                                ",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                    "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+                ]
+            }
+        ];
+
+        // Game State Variables
+        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'GAMEOVER', 'WIN'
+        let currentStageIndex = 0;
+        let score = 0;
+        let coinsCollected = 0;
+        let lives = 3;
+        let gameTime = 300;
+        let timerInterval = null;
+        let cameraX = 0;
+        let animFrameId = null;
+
+        // Player Object
+        const player = {
+            x: 50,
+            y: 200,
+            width: 34,
+            height: 24,
+            vx: 0,
+            vy: 0,
+            speed: 4.6,
+            jumpForce: -13.5, // Daya lompat dinormalkan agar tidak terlalu melayang
+            grounded: false,
+            facingLeft: false,
+            animFrame: 0,
+            animTimer: 0,
+            color: 'blue',
+            coyoteTimer: 0,
+            jumpBufferTimer: 0,
+            jumpCount: 0,
+            maxJumps: 1
+        };
+
+        // Key Input State
+        const keys = {
+            left: false,
+            right: false,
+            jump: false
+        };
+
+        let blocks = [];
+        let coins = [];
+        let enemies = [];
+        let flag = null;
+
+        function loadLevel() {
+            blocks = [];
+            coins = [];
+            enemies = [];
+            flag = null;
+
+            const currentStage = STAGES[currentStageIndex];
+            canvas.style.backgroundColor = currentStage.bgColor;
+            document.getElementById('hud-world').innerText = currentStage.world;
+
+            const levelMap = currentStage.map;
+
+            for (let r = 0; r < levelMap.length; r++) {
+                for (let c = 0; c < levelMap[r].length; c++) {
+                    const char = levelMap[r][c];
+                    const x = c * TILE_SIZE;
+                    const y = r * TILE_SIZE;
+
+                    if (char === 'G') {
+                        blocks.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, type: 'ground' });
+                    } else if (char === 'B') {
+                        blocks.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, type: 'brick' });
+                    } else if (char === '?') {
+                        blocks.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, type: 'question', hit: false });
+                    } else if (char === 'P') {
+                        blocks.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, type: 'pipe_top' });
+                    } else if (char === 'p') {
+                        blocks.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, type: 'pipe_body' });
+                    } else if (char === 'C') {
+                        coins.push({ x: x + 6, y: y + 6, size: 20, collected: false });
+                    } else if (char === 'E') {
+                        enemies.push({ x, y: y + (TILE_SIZE - 24), width: 28, height: 24, vx: -1.2, vy: 0, alive: true });
+                    } else if (char === 'F') {
+                        if (!flag) {
+                            flag = { x, y, width: 8, height: TILE_SIZE * 6 };
+                        }
+                    }
+                }
+            }
+        }
+
+        // Setup Controls (Keyboard & Touch)
+        function initControls() {
+            // Keyboard
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+                if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
+                    if (!keys.jump) {
+                        player.jumpBufferTimer = 8; // Jump Buffer
+                    }
+                    keys.jump = true;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+                if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
+                    keys.jump = false;
+                    if (player.vy < -4) {
+                        player.vy *= 0.65; // Smooth jump height release
+                    }
+                }
+            });
+
+            // Modern Responsive Touch/Pointer Control Binding
+            const bindControl = (elem, keyName) => {
+                if (!elem) return;
+
+                const press = (e) => {
+                    e.preventDefault();
+                    keys[keyName] = true;
+                    elem.classList.add('pressed');
+                    if (keyName === 'jump') {
+                        player.jumpBufferTimer = 8;
+                    }
+                };
+
+                const release = (e) => {
+                    e.preventDefault();
+                    keys[keyName] = false;
+                    elem.classList.remove('pressed');
+                    if (keyName === 'jump' && player.vy < -4) {
+                        player.vy *= 0.65;
+                    }
+                };
+
+                // Instant Pointer Events (Handles touch & mouse seamlessly with zero lag)
+                elem.addEventListener('pointerdown', press, { passive: false });
+                elem.addEventListener('pointerup', release, { passive: false });
+                elem.addEventListener('pointercancel', release, { passive: false });
+                elem.addEventListener('pointerleave', release, { passive: false });
+
+                // Touch Event Fallbacks
+                elem.addEventListener('touchstart', press, { passive: false });
+                elem.addEventListener('touchend', release, { passive: false });
+                elem.addEventListener('touchcancel', release, { passive: false });
+            };
+
+            bindControl(document.getElementById('btn-left'), 'left');
+            bindControl(document.getElementById('btn-right'), 'right');
+            bindControl(document.getElementById('btn-jump'), 'jump');
+        }
+
+        function startGame() {
+            player.color = selectedColorKey;
+            currentStageIndex = 0;
+            score = 0;
+            coinsCollected = 0;
+            lives = 3;
+            gameTime = STAGES[0].time;
+            player.x = 50;
+            player.y = 200;
+            player.vx = 0;
+            player.vy = 0;
+            player.jumpCount = 0;
+            cameraX = 0;
+
+            loadLevel();
+
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('hud-overlay').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            gameState = 'PLAYING';
+            updateHUD();
+
+            startStageTimer();
+
+            if (!animFrameId) {
+                gameLoop();
+            }
+        }
+
+        function startStageTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (gameState === 'PLAYING') {
+                    gameTime--;
+                    document.getElementById('hud-time').innerText = String(gameTime).padStart(3, '0');
+                    if (gameTime <= 0) {
+                        handlePlayerDeath();
+                    }
+                }
+            }, 1000);
+        }
+
+        // Handle Death
+        function handlePlayerDeath() {
+            lives--;
+            audio.playGameOver();
+            if (lives <= 0) {
+                gameState = 'GAMEOVER';
+                showGameOverModal(false);
+            } else {
+                player.x = Math.max(50, cameraX + 50);
+                player.y = 100;
+                player.vx = 0;
+                player.vy = 0;
+                player.jumpCount = 0;
+                updateHUD();
+            }
+        }
+
+        function triggerWin() {
+            gameState = 'WIN';
+            audio.playWin();
+            
+            // Rebalanced high-score calculation (up to ~100k pts per stage max)
+            const timeBonus = gameTime * 250;
+            const stageClearBonus = 25000;
+            score += timeBonus + stageClearBonus;
+            
+            updateHUD();
+
+            const isFinalStage = currentStageIndex >= STAGES.length - 1;
+            showGameOverModal(true, isFinalStage);
+        }
+
+        function nextStage() {
+            currentStageIndex++;
+            gameTime = STAGES[currentStageIndex].time;
+            player.x = 50;
+            player.y = 200;
+            player.vx = 0;
+            player.vy = 0;
+            player.jumpCount = 0;
+            cameraX = 0;
+
+            loadLevel();
+
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            gameState = 'PLAYING';
+            updateHUD();
+            startStageTimer();
+        }
+
+        function showGameOverModal(isWin, isFinalStage = false) {
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('touch-controls').classList.add('hidden');
+            const modal = document.getElementById('game-over-modal');
+            const title = document.getElementById('game-over-title');
+            const btnNext = document.getElementById('btn-next-stage');
+            const btnRestart = document.getElementById('btn-restart');
+            
+            if (isWin) {
+                if (isFinalStage) {
+                    title.innerText = "ALL STAGES CLEARED!";
+                    title.className = "text-xl text-amber-400";
+                    btnNext.classList.add('hidden');
+                    btnRestart.classList.remove('hidden');
+                } else {
+                    title.innerText = `STAGE ${STAGES[currentStageIndex].world} CLEARED!`;
+                    title.className = "text-xl text-emerald-400";
+                    btnNext.classList.remove('hidden');
+                    btnRestart.classList.add('hidden');
+                }
+            } else {
+                title.innerText = "GAME OVER";
+                title.className = "text-xl text-rose-500";
+                btnNext.classList.add('hidden');
+                btnRestart.classList.remove('hidden');
+            }
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-coins').innerText = coinsCollected;
+            modal.classList.remove('hidden');
+
+            // Save & Accumulate points to leaderboard
+            saveScoreToLeaderboard(score, coinsCollected);
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function returnToMenu() {
+            if (timerInterval) clearInterval(timerInterval);
+            gameState = 'MENU';
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('hud-overlay').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+            document.getElementById('menu-overlay').classList.remove('hidden');
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-score').innerText = String(score).padStart(6, '0');
+            document.getElementById('hud-coins').innerText = String(coinsCollected).padStart(2, '0');
+            document.getElementById('hud-lives').innerText = `x ${lives}`;
+            document.getElementById('hud-time').innerText = String(gameTime).padStart(3, '0');
+        }
+    </script>
+
+    <script>
+        // Main Game Update Loop
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // Coyote Time & Jump Buffer Processing
+            if (player.grounded) {
+                player.coyoteTimer = 6;
+                player.jumpCount = 0;
+            } else if (player.coyoteTimer > 0) {
+                player.coyoteTimer--;
+            }
+
+            if (player.jumpBufferTimer > 0) {
+                player.jumpBufferTimer--;
+            }
+
+            // Execute Jump (Single High Jump)
+            if (player.jumpBufferTimer > 0) {
+                if (player.coyoteTimer > 0 || player.grounded) {
+                    player.vy = player.jumpForce;
+                    player.grounded = false;
+                    player.coyoteTimer = 0;
+                    player.jumpBufferTimer = 0;
+                    player.jumpCount = 1;
+                    audio.playJump();
+                }
+            }
+
+            // Horizontal Movement Physics
+            if (keys.left) {
+                player.vx = -player.speed;
+                player.facingLeft = true;
+            } else if (keys.right) {
+                player.vx = player.speed;
+                player.facingLeft = false;
+            } else {
+                player.vx *= FRICTION;
+            }
+
+            // Apply Gravity
+            player.vy += GRAVITY;
+
+            // Player Animation
+            if (Math.abs(player.vx) > 0.5) {
+                player.animTimer++;
+                if (player.animTimer % 8 === 0) {
+                    player.animFrame = (player.animFrame + 1) % 3;
+                }
+            } else {
+                player.animFrame = 0;
+            }
+
+            // Move Horizontal & Collide
+            player.x += player.vx;
+            blocks.forEach(b => {
+                if (checkCollision(player, b)) {
+                    if (player.vx > 0) player.x = b.x - player.width;
+                    else if (player.vx < 0) player.x = b.x + b.width;
+                }
+            });
+
+            // Move Vertical & Collide
+            player.grounded = false;
+            player.y += player.vy;
+            blocks.forEach(b => {
+                if (checkCollision(player, b)) {
+                    if (player.vy > 0) { // Landing on top
+                        player.y = b.y - player.height;
+                        player.vy = 0;
+                        player.grounded = true;
+                        player.jumpCount = 0;
+                    } else if (player.vy < 0) { // Bumping bottom
+                        player.y = b.y + b.height;
+                        player.vy = 0;
+                        audio.playBump();
+
+                        if (b.type === 'question' && !b.hit) {
+                            b.hit = true;
+                            score += 5000; // Increased points for ~100k max stage score
+                            coinsCollected++;
+                            audio.playCoin();
+                            updateHUD();
+                        }
+                    }
+                }
+            });
+
+            // Coin Pickups
+            coins.forEach(c => {
+                if (!c.collected && checkCoinCollision(player, c)) {
+                    c.collected = true;
+                    score += 2500; // Increased coin points
+                    coinsCollected++;
+                    audio.playCoin();
+                    updateHUD();
+                }
+            });
+
+            // Enemy Logic & Stomping
+            enemies.forEach(e => {
+                if (!e.alive) return;
+
+                e.vy = (e.vy || 0) + GRAVITY;
+                e.y += e.vy;
+
+                blocks.forEach(b => {
+                    if (checkCollision(e, b)) {
+                        if (e.vy > 0) {
+                            e.y = b.y - e.height;
+                            e.vy = 0;
+                        }
+                    }
+                });
+
+                e.x += e.vx;
+                blocks.forEach(b => {
+                    if (checkCollision(e, b)) {
+                        if (e.vx > 0) {
+                            e.x = b.x - e.width;
+                            e.vx = -e.vx;
+                        } else if (e.vx < 0) {
+                            e.x = b.x + b.width;
+                            e.vx = -e.vx;
+                        }
+                    }
+                });
+
+                if (checkCollision(player, e)) {
+                    if (player.vy > 0 && player.y + player.height - player.vy <= e.y + 12) {
+                        e.alive = false;
+                        player.vy = -7.5;
+                        score += 5000; // Increased enemy defeat points
+                        audio.playStomp();
+                        updateHUD();
+                    } else {
+                        handlePlayerDeath();
+                    }
+                }
+            });
+
+            // Check Flagpole / Win condition
+            if (flag && checkCollision(player, flag)) {
+                triggerWin();
+            }
+
+            // Fall into pit
+            if (player.y > canvas.height + 100) {
+                handlePlayerDeath();
+            }
+
+            // Smooth Camera Follow
+            cameraX = Math.max(0, player.x - canvas.width / 3);
+        }
+
+        // Collision Utilities
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function checkCoinCollision(p, c) {
+            return p.x < c.x + c.size &&
+                   p.x + p.width > c.x &&
+                   p.y < c.y + c.size &&
+                   p.y + p.height > c.y;
+        }
+
+        // Render Game Graphics
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // --- Draw DLICOM Logo as Static Background Watermark ---
+            drawDlicomBackgroundLogo(ctx, canvas.width / 2, canvas.height / 2 - 20, 2.8);
+
+            ctx.save();
+            ctx.translate(-Math.floor(cameraX), 0);
+
+            // 1. Draw Clouds & Sky elements
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.arc(200, 60, 25, 0, Math.PI * 2);
+            ctx.arc(230, 60, 35, 0, Math.PI * 2);
+            ctx.arc(260, 60, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(600, 80, 30, 0, Math.PI * 2);
+            ctx.arc(640, 80, 40, 0, Math.PI * 2);
+            ctx.arc(680, 80, 30, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // 2. Draw World Map Blocks
+            blocks.forEach(b => {
+                if (b.x + b.width < cameraX - 50 || b.x > cameraX + canvas.width + 50) return;
+
+                if (b.type === 'ground') {
+                    ctx.fillStyle = '#c84c0c';
+                    ctx.fillRect(b.x, b.y, b.width, b.height);
+                    ctx.fillStyle = '#00a800';
+                    ctx.fillRect(b.x, b.y, b.width, 6);
+                    ctx.fillStyle = '#fcbc00';
+                    ctx.fillRect(b.x + 2, b.y + 8, 4, 4);
+                } else if (b.type === 'brick') {
+                    ctx.fillStyle = '#c84c0c';
+                    ctx.fillRect(b.x, b.y, b.width, b.height);
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(b.x, b.y, b.width, b.height);
+                    ctx.beginPath();
+                    ctx.moveTo(b.x, b.y + 16);
+                    ctx.lineTo(b.x + b.width, b.y + 16);
+                    ctx.stroke();
+                } else if (b.type === 'question') {
+                    ctx.fillStyle = b.hit ? '#808080' : '#fcbc00';
+                    ctx.fillRect(b.x, b.y, b.width, b.height);
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(b.x, b.y, b.width, b.height);
+                    if (!b.hit) {
+                        ctx.fillStyle = '#000000';
+                        ctx.font = '16px "Press Start 2P"';
+                        ctx.fillText('?', b.x + 8, b.y + 24);
+                    }
+                } else if (b.type === 'pipe_top') {
+                    const lipOverhang = 4;
+                    const lipX = b.x - lipOverhang;
+                    const lipWidth = b.width + (lipOverhang * 2);
+
+                    ctx.fillStyle = '#00a800';
+                    ctx.fillRect(lipX, b.y, lipWidth, b.height);
+
+                    ctx.fillStyle = '#80d010';
+                    ctx.fillRect(lipX + 3, b.y + 2, 6, b.height - 3);
+                    ctx.fillStyle = '#b8f050';
+                    ctx.fillRect(lipX + 5, b.y + 2, 2, b.height - 3);
+
+                    ctx.fillStyle = '#005800';
+                    ctx.fillRect(lipX + lipWidth - 9, b.y + 2, 6, b.height - 3);
+
+                    ctx.fillStyle = '#002800';
+                    ctx.fillRect(lipX + 2, b.y, lipWidth - 4, 4);
+
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(lipX, b.y, lipWidth, b.height);
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fillRect(b.x, b.y + b.height, b.width, 4);
+
+                } else if (b.type === 'pipe_body') {
+                    ctx.fillStyle = '#00a800';
+                    ctx.fillRect(b.x, b.y, b.width, b.height);
+
+                    ctx.fillStyle = '#80d010';
+                    ctx.fillRect(b.x + 3, b.y, 6, b.height);
+                    ctx.fillStyle = '#b8f050';
+                    ctx.fillRect(b.x + 5, b.y, 2, b.height);
+
+                    ctx.fillStyle = '#005800';
+                    ctx.fillRect(b.x + b.width - 9, b.y, 6, b.height);
+
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(b.x, b.y);
+                    ctx.lineTo(b.x, b.y + b.height);
+                    ctx.moveTo(b.x + b.width, b.y);
+                    ctx.lineTo(b.x + b.width, b.y + b.height);
+                    ctx.stroke();
+                }
+            });
+
+            // 3. Draw Flagpole Structure
+            if (flag) {
+                ctx.fillStyle = '#c84c0c';
+                ctx.fillRect(flag.x - 12, flag.y + flag.height - TILE_SIZE, TILE_SIZE + 16, TILE_SIZE);
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(flag.x - 12, flag.y + flag.height - TILE_SIZE, TILE_SIZE + 16, TILE_SIZE);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(flag.x + 2, flag.y, flag.width, flag.height - TILE_SIZE);
+                ctx.fillStyle = '#b0b0b0';
+                ctx.fillRect(flag.x + 6, flag.y, 2, flag.height - TILE_SIZE);
+                ctx.strokeStyle = '#000000';
+                ctx.strokeRect(flag.x + 2, flag.y, flag.width, flag.height - TILE_SIZE);
+
+                ctx.fillStyle = '#fcbc00';
+                ctx.beginPath();
+                ctx.arc(flag.x + 6, flag.y - 4, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(flag.x + 3, flag.y - 7, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(flag.x + 6, flag.y - 4, 10, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#00a800';
+                ctx.beginPath();
+                ctx.moveTo(flag.x - 2, flag.y + 10);
+                ctx.lineTo(flag.x - 34, flag.y + 25);
+                ctx.lineTo(flag.x - 2, flag.y + 40);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#000000';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(flag.x - 14, flag.y + 25, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 4. Draw Coins
+            const coinAnimFrame = Date.now() / 10;
+            coins.forEach(c => {
+                if (!c.collected) {
+                    drawPixelCoin(ctx, c.x, c.y, c.size, coinAnimFrame);
+                }
+            });
+
+            // 5. Draw Enemies
+            enemies.forEach(e => {
+                if (e.alive) {
+                    ctx.fillStyle = '#a81000';
+                    ctx.fillRect(e.x, e.y + 6, e.width, e.height - 6);
+                    ctx.fillRect(e.x + 4, e.y, e.width - 8, e.height);
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(e.x + 4, e.y + 6, 4, 8);
+                    ctx.fillRect(e.x + e.width - 8, e.y + 6, 4, 8);
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(e.x + 6, e.y + 8, 2, 4);
+                    ctx.fillRect(e.x + e.width - 6, e.y + 8, 2, 4);
+                }
+            });
+
+            // 6. Draw Main Character
+            drawDlicomCharacter(
+                ctx,
+                player.x,
+                player.y,
+                player.width,
+                player.height,
+                player.color,
+                player.facingLeft,
+                player.animFrame
+            );
+
+            ctx.restore();
+        }
+
+        // Main Animation Loop
+        function gameLoop() {
+            update();
+            render();
+            animFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize Controls
+        initControls();
+    </script>
+
+    <script>
+        // Local Leaderboard Fallback with Accumulative Score System
+        function getLocalScores() {
+            try {
+                const stored = localStorage.getItem('dlicom_pixel_scores');
+                return stored ? JSON.parse(stored) : [
+                    { name: 'SUPER_MARIO', score: 250000, coins: 85, gamesPlayed: 3 },
+                    { name: 'DLICOM_HERO', score: 180000, coins: 62, gamesPlayed: 2 },
+                    { name: 'PIXEL_MASTER', score: 95000, coins: 34, gamesPlayed: 1 }
+                ];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function saveLocalScore(name, addScore, addCoins) {
+            try {
+                let list = getLocalScores();
+                const upperName = name.toUpperCase();
+                let existing = list.find(item => item.name === upperName);
+
+                if (existing) {
+                    // Accumulate score, coins, and increment played games count
+                    existing.score = (existing.score || 0) + addScore;
+                    existing.coins = (existing.coins || 0) + addCoins;
+                    existing.gamesPlayed = (existing.gamesPlayed || 1) + 1;
+                } else {
+                    list.push({
+                        name: upperName,
+                        score: addScore,
+                        coins: addCoins,
+                        gamesPlayed: 1
+                    });
+                }
+
+                list.sort((a, b) => b.score - a.score);
+                list = list.slice(0, 15);
+                localStorage.setItem('dlicom_pixel_scores', JSON.stringify(list));
+            } catch(e) {}
+        }
+
+        async function saveScoreToLeaderboard(finalScore, coins) {
+            const nameInput = document.getElementById('player-name-input');
+            const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim().toUpperCase() : 'PLAYER1';
+
+            saveLocalScore(name, finalScore, coins);
+
+            // Cloud Firestore integration
+            if (window.FirebaseApp && window.FirebaseApp.isInitialized && window.FirebaseApp.db) {
+                try {
+                    const { db, appId } = window.FirebaseApp;
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+                    await addDoc(colRef, {
+                        name: name,
+                        score: finalScore,
+                        coins: coins,
+                        timestamp: Date.now()
+                    });
+                } catch(e) {
+                    console.warn("Firestore score save fallback:", e);
+                }
+            }
+        }
+
+        async function openLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+            const listContainer = document.getElementById('leaderboard-list');
+            listContainer.innerHTML = '<p class="text-slate-400 text-center py-4 animate-pulse">Loading scores...</p>';
+
+            let rawScores = [];
+
+            if (window.FirebaseApp && window.FirebaseApp.isInitialized && window.FirebaseApp.db) {
+                try {
+                    const { db, appId } = window.FirebaseApp;
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+                    const snapshot = await getDocs(colRef);
+                    snapshot.forEach(doc => {
+                        rawScores.push(doc.data());
+                    });
+                } catch(e) {
+                    console.warn("Cloud fetch error:", e);
+                }
+            }
+
+            // Fallback or local aggregation
+            let combinedScores = {};
+            if (rawScores.length > 0) {
+                rawScores.forEach(s => {
+                    const n = (s.name || 'ANONYMOUS').toUpperCase();
+                    if (!combinedScores[n]) {
+                        combinedScores[n] = { name: n, score: 0, coins: 0, gamesPlayed: 0 };
+                    }
+                    combinedScores[n].score += (s.score || 0);
+                    combinedScores[n].coins += (s.coins || 0);
+                    combinedScores[n].gamesPlayed += 1;
+                });
+            } else {
+                getLocalScores().forEach(s => {
+                    combinedScores[s.name] = s;
+                });
+            }
+
+            let sortedList = Object.values(combinedScores);
+            sortedList.sort((a, b) => b.score - a.score);
+
+            if (sortedList.length === 0) {
+                listContainer.innerHTML = '<p class="text-slate-400 py-4">No high scores yet! Be the first!</p>';
+                return;
+            }
+
+            let html = '';
+            sortedList.slice(0, 10).forEach((s, idx) => {
+                const rankColor = idx === 0 ? 'text-yellow-400 font-bold' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-200';
+                html += `
+                    <div class="flex justify-between items-center bg-slate-900/90 p-2.5 rounded border border-slate-700">
+                        <div class="flex items-center gap-2">
+                            <span class="${rankColor} w-6 text-left">#${idx + 1}</span>
+                            <div class="flex flex-col text-left">
+                                <span class="text-white">${s.name || 'ANONYMOUS'}</span>
+                                <span class="text-[8px] text-slate-400">GAMES: ${s.gamesPlayed || 1}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-amber-400">${s.score} PTS</span>
+                            <span class="text-yellow-300 text-[10px]">${s.coins || 0} 🪙</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listContainer.innerHTML = html;
+        }
+
+        window.loadOnlineLeaderboard = openLeaderboard;
+
+        function closeLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+
+</html>
